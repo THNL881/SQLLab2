@@ -1,0 +1,212 @@
+CREATE TABLE filiaal (
+filiaal_id INTEGER PRIMARY KEY,
+filiaal_naam VARCHAR(20) NOT NULL,
+locatie VARCHAR(20) NOT NULL,
+manager_id INTEGER
+);
+
+CREATE TABLE voertuig (
+voertuig_id INTEGER PRIMARY KEY,
+filiaal_id INTEGER NOT NULL,
+capaciteit INTEGER,
+soort CHAR,
+FOREIGN KEY (filiaal_id) REFERENCES filiaal(filiaal_id));
+
+CREATE TABLE categorie (
+categ_id TEXT PRIMARY KEY);
+
+CREATE TABLE product (
+product_id INTEGER PRIMARY KEY,
+categorie TEXT REFERENCES categorie(categ_id),
+naam VARCHAR(20) UNIQUE,
+prijs INTEGER);
+
+
+CREATE TABLE personeel (
+pers_id INTEGER PRIMARY KEY,
+voornaam VARCHAR(20) NOT NULL,
+achternaam VARCHAR(20) NOT NULL,
+salaris INTEGER,
+filiaal_id,
+FOREIGN KEY (filiaal_id) REFERENCES filiaal(filiaal_id));
+
+CREATE TABLE manager (
+manager_id INTEGER REFERENCES personeel(pers_id),
+filiaal_id INTEGER UNIQUE,
+FOREIGN KEY (filiaal_id) REFERENCES personeel(filiaal_id),
+PRIMARY KEY (manager_id));
+
+CREATE TABLE bezorger (
+bezorger_id INTEGER REFERENCES personeel(pers_id),
+rijbewijs CHAR,
+PRIMARY KEY (bezorger_id));
+
+CREATE TABLE klant (
+klant_id INTEGER PRIMARY KEY,
+voornaam VARCHAR(20) NOT NULL,
+achternaam VARCHAR(20) NOT NULL,
+email VARCHAR(20) NOT NULL,
+huisnr INTEGER NOT NULL,
+postcode VARCHAR(6) NOT NULL);
+
+CREATE TABLE winkelkar (
+kar_id INTEGER PRIMARY KEY,
+klant_id INTEGER NOT NULL,
+totaalprijs INTEGER,
+FOREIGN KEY (klant_id) REFERENCES klant(klant_id));
+
+CREATE TABLE bestelling (
+bestel_id INTEGER PRIMARY KEY,
+kar_id INTEGER,
+totaalprijs INTEGER,
+huisnr INTEGER,
+postcode TEXT,
+besteldatum DATE,
+FOREIGN KEY (kar_id) REFERENCES winkelkar(kar_id),
+FOREIGN KEY (huisnr) REFERENCES klant(huisnr),
+FOREIGN KEY (postcode) REFERENCES klant(postcode));
+
+CREATE TABLE bezorging (
+bezorg_id INTEGER PRIMARY KEY,
+bestel_id INTEGER NOT NULL,
+huisnr INTEGER,
+postcode TEXT,
+FOREIGN KEY (bestel_id) REFERENCES bestelling(bestel_id),
+FOREIGN KEY (huisnr) REFERENCES bestelling(huisnr),
+FOREIGN KEY (postcode) REFERENCES bestelling(postcode));
+
+
+
+CREATE TABLE _incart (
+kar_id INTEGER NOT NULL,
+product_id INTEGER,
+prijs INTEGER,
+FOREIGN KEY (kar_id) REFERENCES winkelkar(kar_id),
+FOREIGN KEY (product_id) REFERENCES product(product_id)
+);
+
+CREATE TABLE _baasvan (
+bezorger_id INTEGER REFERENCES bezorger(bezorger_id),
+manager_id INTEGER,
+PRIMARY KEY (bezorger_id),
+FOREIGN KEY (manager_id) REFERENCES manager(manager_id));
+
+CREATE TABLE _bestuurd (
+bezorger_id INTEGER REFERENCES bezorger(bezorger_id),
+voertuig_id INTEGER,
+datum DATE,
+PRIMARY KEY (bezorger_id),
+FOREIGN KEY (voertuig_id) REFERENCES voertuig (voertuig_id));
+
+
+
+CREATE
+TRIGGER calc_sum_insert AFTER INSERT 
+ON _incart 
+FOR EACH ROW BEGIN
+UPDATE winkelkar
+SET totaalprijs = (
+Select SUM(prijs)
+FROM _incart
+WHERE _incart.kar_id = NEW.kar_id
+)
+WHERE winkelkar.kar_id = NEW.kar_id;
+END;
+
+CREATE
+TRIGGER calc_sum_delete AFTER DELETE 
+ON _incart 
+FOR EACH ROW BEGIN
+UPDATE winkelkar
+SET totaalprijs = (
+Select SUM(prijs)
+FROM _incart
+WHERE _incart.kar_id = OLD.kar_id
+)
+WHERE winkelkar.kar_id = OLD.kar_id;
+END;
+
+CREATE 
+TRIGGER create_cart AFTER INSERT 
+ON klant 
+FOR EACH ROW BEGIN
+INSERT INTO winkelkar (klant_id) VALUES (NEW.klant_id);
+END;
+
+CREATE
+TRIGGER clear_cart AFTER INSERT
+ON bestelling
+FOR EACH ROW BEGIN
+DELETE FROM _incart
+WHERE kar_id = NEW.kar_id;
+END;
+
+CREATE 
+TRIGGER set_manager AFTER INSERT
+ON manager
+FOR EACH ROW BEGIN
+UPDATE filiaal
+SET manager_id = NEW.manager_id
+WHERE filiaal_id = NEW.filiaal_id;
+END;
+
+
+
+
+INSERT INTO filiaal (filiaal_naam, locatie) VALUES 
+('Jumbo', 'Utrecht'), 
+('Lidl', 'Limburg');
+
+INSERT INTO personeel (voornaam, achternaam, salaris, filiaal_id) VALUES 
+('Henk', 'Vernooij', 2000, 1),
+('Hugo', 'Bakker', 1500, 1),
+('Manny', 'de Vee', 2500, 1),
+('Gerda', 'Huis', 2000, 2),
+('Tess', 'Tikkel', 1200, 2),
+('Benny', 'Boom', 1800, 2);
+
+INSERT INTO voertuig (filiaal_id, capaciteit, soort) VALUES
+('1', '20', 'B'), 
+('1', '60', 'C'), 
+('2', '30', 'B'); 
+
+INSERT INTO manager 
+SELECT pers_id, filiaal_id FROM personeel
+WHERE voornaam = 'Gerda' OR voornaam = 'Manny';
+
+INSERT INTO bezorger (bezorger_id) 
+SELECT pers_id FROM personeel
+WHERE pers_id NOT IN (
+SELECT pers_id FROM personeel, manager
+WHERE personeel.pers_id = manager.manager_id
+);
+
+INSERT INTO _bestuurd (bezorger_id, voertuig_id) VALUES
+('1', '1'),
+('2', '2'),
+('5', '3');
+
+INSERT INTO categorie VALUES ('vlees'), ('zuivel'), ('groente'), ('houdbaar');
+
+INSERT INTO product (categorie, naam, prijs) VALUES
+('vlees', 'kip', 2.99),
+('vlees', 'gehakt', 3.49),
+('groente', 'wortel', 0.99),
+('groente', 'spinazie', 2.29),
+('zuivel', 'yoghurt', 1.89),
+('zuivel', 'melk', 1.39),
+('houdbaar', 'fanta', 1.99),
+('houdbaar', 'pindakaas', 2.59);
+
+INSERT INTO klant (voornaam, achternaam, email, huisnr, postcode) VALUES
+('Peter', 'Loo', 'peterloo@hotmail.com', 7, '2391AB'),
+('Helga', 'Kok', 'helgakok@gmail.com', 36, '6421CR'),
+('Mike', 'de Beer', 'mikedebeer@msn.com', 19, '5449DN');
+
+INSERT INTO _incart VALUES
+('1','2','3.49'),
+('1','4','2.29'),
+('2','7','1.99'),
+('3','2','3.49'),
+('3','8','2.59');
+
