@@ -1,0 +1,6 @@
+--query 1
+--Dit is een query die een complete lijst van personeel aangeeft, en als ze een bezorger zijn laat het ook hun bezorgID zien.
+
+SELECT voornaam, pers_id, bezorger_id
+FROM personeel LEFT OUTER JOIN bezorger
+ON personeel.pers_id = bezorger.bezorger_id;

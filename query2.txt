@@ -1,0 +1,6 @@
+--query 2
+-- Deze query geeft aan in welke karren er geen producten in zitten
+
+SELECT kar_id, klant_id 
+FROM winkelkar
+WHERE totaalprijs IS NULL;
